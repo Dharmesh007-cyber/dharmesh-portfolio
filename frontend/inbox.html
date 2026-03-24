@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Inbox — Portfolio Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0a; --bg2: #111; --bg3: #1a1a1a;
+    --accent: #e8ff47; --accent2: #ff6b35; --info: #4a9eff;
+    --text: #f0ede8; --muted: #7a7672; --border: rgba(240,237,232,0.08);
+    --high: #e8ff47; --normal: #4a9eff; --low: #7a7672;
+    --font-d: 'Syne', sans-serif; --font-b: 'DM Mono', monospace;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-b); font-weight: 300; min-height: 100vh; }
+
+  /* AUTH OVERLAY */
+  #authOverlay {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 999; flex-direction: column; gap: 1.5rem;
+  }
+  .auth-box {
+    background: var(--bg2); border: 1px solid var(--border);
+    padding: 2.5rem; width: 360px; display: flex; flex-direction: column; gap: 1rem;
+  }
+  .auth-title { font-family: var(--font-d); font-weight: 800; font-size: 1.4rem; }
+  .auth-sub { font-size: 0.75rem; color: var(--muted); }
+  .auth-input {
+    background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+    font-family: var(--font-b); font-size: 0.85rem; padding: 0.75rem 1rem; width: 100%; outline: none;
+  }
+  .auth-input:focus { border-color: var(--accent); }
+  .auth-btn {
+    background: var(--accent); color: var(--bg); border: none;
+    font-family: var(--font-b); font-size: 0.8rem; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 0.9rem; cursor: pointer;
+  }
+  .auth-error { font-size: 0.75rem; color: var(--accent2); display: none; }
+
+  /* LAYOUT */
+  .app { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+
+  /* SIDEBAR */
+  .sidebar {
+    border-right: 1px solid var(--border); padding: 2rem 1.5rem;
+    display: flex; flex-direction: column; gap: 2rem; position: sticky; top: 0; height: 100vh;
+  }
+  .sidebar-logo { font-family: var(--font-d); font-weight: 800; color: var(--accent); font-size: 1rem; }
+  .sidebar-sub { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 0.2rem; }
+
+  .stat-cards { display: flex; flex-direction: column; gap: 0.5rem; }
+  .stat-card {
+    padding: 0.9rem 1rem; background: var(--bg2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .stat-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .stat-val { font-family: var(--font-d); font-weight: 700; font-size: 1.2rem; color: var(--accent); }
+
+  .filter-label { font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.6rem; }
+  .filter-btns { display: flex; flex-direction: column; gap: 0.3rem; }
+  .filter-btn {
+    padding: 0.55rem 0.8rem; border: 1px solid var(--border); background: transparent;
+    color: var(--muted); font-family: var(--font-b); font-size: 0.75rem;
+    text-align: left; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 0.5rem;
+  }
+  .filter-btn:hover { background: var(--bg2); color: var(--text); }
+  .filter-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(232,255,71,0.05); }
+  .filter-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+  .sidebar-back { margin-top: auto; font-size: 0.72rem; color: var(--muted); text-decoration: none; }
+  .sidebar-back:hover { color: var(--text); }
+
+  /* MAIN */
+  .main { display: flex; flex-direction: column; }
+  .topbar {
+    padding: 1.5rem 2rem; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+  }
+  .topbar-title { font-family: var(--font-d); font-weight: 700; font-size: 1.1rem; }
+  .topbar-count { font-size: 0.75rem; color: var(--muted); }
+  .sort-btns { display: flex; gap: 0.5rem; }
+  .sort-btn {
+    padding: 0.4rem 0.9rem; border: 1px solid var(--border); background: transparent;
+    color: var(--muted); font-family: var(--font-b); font-size: 0.7rem; letter-spacing: 0.06em;
+    text-transform: uppercase; cursor: pointer; transition: all 0.15s;
+  }
+  .sort-btn.active { border-color: var(--accent); color: var(--accent); }
+  .sort-btn:hover { border-color: var(--muted); color: var(--text); }
+
+  /* INBOX LIST */
+  .inbox-container { display: grid; grid-template-columns: 1fr 1.4fr; flex: 1; }
+
+  .messages-list { border-right: 1px solid var(--border); overflow-y: auto; max-height: calc(100vh - 73px); }
+  .loading-msg { padding: 3rem 2rem; text-align: center; color: var(--muted); font-size: 0.82rem; }
+
+  .message-item {
+    padding: 1.2rem 1.5rem; border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background 0.15s; position: relative;
+  }
+  .message-item:hover { background: var(--bg2); }
+  .message-item.active { background: var(--bg3); border-left: 2px solid var(--accent); }
+  .message-item.unread .msg-subject { font-weight: 400; color: var(--text); }
+
+  .msg-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; }
+  .msg-name { font-size: 0.85rem; font-weight: 400; color: var(--text); }
+  .msg-date { font-size: 0.65rem; color: var(--muted); }
+
+  .msg-subject { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .msg-preview { font-size: 0.72rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .msg-footer { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.7rem; flex-wrap: wrap; }
+  .priority-badge {
+    font-size: 0.6rem; padding: 0.2rem 0.5rem; letter-spacing: 0.08em; text-transform: uppercase;
+    border: 1px solid; border-radius: 2px;
+  }
+  .priority-badge.high { color: var(--high); border-color: var(--high); background: rgba(232,255,71,0.07); }
+  .priority-badge.normal { color: var(--normal); border-color: var(--normal); background: rgba(74,158,255,0.07); }
+  .priority-badge.low { color: var(--low); border-color: var(--low); }
+
+  .score-bar { display: flex; align-items: center; gap: 0.4rem; }
+  .score-num { font-size: 0.65rem; color: var(--muted); min-width: 28px; }
+  .score-track { width: 60px; height: 3px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width 0.4s; }
+
+  /* MESSAGE DETAIL */
+  .message-detail { overflow-y: auto; max-height: calc(100vh - 73px); padding: 2rem; }
+  .detail-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--muted); gap: 0.5rem; }
+  .detail-empty-icon { font-size: 2rem; }
+
+  .detail-meta { margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+  .detail-from { font-family: var(--font-d); font-weight: 700; font-size: 1.1rem; margin-bottom: 0.4rem; }
+  .detail-email { font-size: 0.78rem; color: var(--info); margin-bottom: 1rem; }
+  .detail-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1.5rem; }
+  .detail-info-row { display: flex; flex-direction: column; gap: 0.15rem; }
+  .detail-info-label { font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .detail-info-val { font-size: 0.8rem; color: var(--text); }
+
+  .detail-subject { font-family: var(--font-d); font-weight: 700; font-size: 1rem; margin: 1.2rem 0 0.8rem; }
+  .detail-body { font-size: 0.85rem; color: #c8c5c0; line-height: 1.8; white-space: pre-wrap; }
+
+  /* AI ANALYSIS PANEL */
+  .ai-panel {
+    margin-top: 2rem; padding: 1.5rem; background: var(--bg2); border: 1px solid var(--border);
+  }
+  .ai-panel-title {
+    display: flex; align-items: center; gap: 0.6rem; font-size: 0.7rem;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.2rem;
+  }
+  .ai-icon { font-size: 0.9rem; }
+
+  .ai-score-big { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 1rem; }
+  .ai-score-num { font-family: var(--font-d); font-size: 2.5rem; font-weight: 800; color: var(--accent); }
+  .ai-score-denom { font-size: 0.8rem; color: var(--muted); }
+
+  .ai-summary { font-size: 0.82rem; color: var(--text); line-height: 1.7; margin-bottom: 1.2rem; }
+
+  .ai-insights { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.2rem; }
+  .insight-item { display: flex; gap: 0.7rem; align-items: flex-start; }
+  .insight-bullet { color: var(--accent); font-size: 0.7rem; margin-top: 0.2rem; flex-shrink: 0; }
+  .insight-text { font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
+
+  .ai-reply-hint {
+    padding: 0.8rem 1rem; background: rgba(232,255,71,0.05);
+    border-left: 2px solid var(--accent); font-size: 0.78rem; color: var(--muted); line-height: 1.6;
+    font-style: italic;
+  }
+
+  .ai-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 1rem 0; }
+  .ai-tag { font-size: 0.62rem; padding: 0.25rem 0.6rem; border: 1px solid var(--border); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .detail-actions { display: flex; gap: 0.8rem; margin-top: 1.5rem; }
+  .action-btn {
+    padding: 0.6rem 1.2rem; border: 1px solid var(--border); background: transparent;
+    color: var(--muted); font-family: var(--font-b); font-size: 0.72rem;
+    letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: all 0.15s;
+  }
+  .action-btn:hover { border-color: var(--muted); color: var(--text); }
+  .action-btn.danger:hover { border-color: var(--accent2); color: var(--accent2); }
+  .action-btn.primary { border-color: var(--accent); color: var(--accent); }
+  .action-btn.primary:hover { background: var(--accent); color: var(--bg); }
+
+  .analyzing-badge {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    font-size: 0.68rem; color: var(--muted); padding: 0.4rem 0.7rem;
+    border: 1px solid var(--border); letter-spacing: 0.06em;
+  }
+  .analyzing-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
+</style>
+</head>
+<body>
+
+<!-- AUTH OVERLAY -->
+<div id="authOverlay">
+  <div class="auth-box">
+    <div class="auth-title">Admin Inbox</div>
+    <div class="auth-sub">Enter your admin token to access the AI-powered inbox</div>
+    <input class="auth-input" type="password" id="tokenInput" placeholder="Admin token..." autocomplete="off">
+    <div class="auth-error" id="authError">Invalid token. Check your .env ADMIN_TOKEN.</div>
+    <button class="auth-btn" onclick="login()">Enter →</button>
+    <div style="font-size:0.68rem; color:var(--muted)">Default token: <code style="color:var(--accent)">admin123</code> (change in .env)</div>
+  </div>
+</div>
+
+<div class="app" id="appContent" style="display:none">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div>
+      <div class="sidebar-logo">AI Inbox</div>
+      <div class="sidebar-sub">Portfolio Contact Pipeline</div>
+    </div>
+
+    <div class="stat-cards" id="statCards">
+      <div class="stat-card"><span class="stat-label">Total</span><span class="stat-val" id="s-total">—</span></div>
+      <div class="stat-card"><span class="stat-label">High Priority</span><span class="stat-val" id="s-high">—</span></div>
+      <div class="stat-card"><span class="stat-label">Unread</span><span class="stat-val" id="s-unread">—</span></div>
+      <div class="stat-card"><span class="stat-label">Avg Score</span><span class="stat-val" id="s-avg">—</span></div>
+    </div>
+
+    <div>
+      <div class="filter-label">Filter by Priority</div>
+      <div class="filter-btns">
+        <button class="filter-btn active" onclick="setFilter('all', this)">
+          <span class="filter-dot" style="background:var(--muted)"></span>All Messages
+        </button>
+        <button class="filter-btn" onclick="setFilter('high', this)">
+          <span class="filter-dot" style="background:var(--high)"></span>High Priority
+        </button>
+        <button class="filter-btn" onclick="setFilter('normal', this)">
+          <span class="filter-dot" style="background:var(--normal)"></span>Normal
+        </button>
+        <button class="filter-btn" onclick="setFilter('low', this)">
+          <span class="filter-dot" style="background:var(--low)"></span>Low Priority
+        </button>
+      </div>
+    </div>
+
+    <a class="sidebar-back" href="/">← Back to Portfolio</a>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">Incoming Messages</div>
+        <div class="topbar-count" id="msgCount">Loading...</div>
+      </div>
+      <div class="sort-btns">
+        <button class="sort-btn active" onclick="setSort('score', this)">By Score</button>
+        <button class="sort-btn" onclick="setSort('date', this)">By Date</button>
+        <button class="sort-btn" onclick="loadData()">↻ Refresh</button>
+      </div>
+    </div>
+
+    <div class="inbox-container">
+      <div class="messages-list" id="messagesList">
+        <div class="loading-msg">Loading messages...</div>
+      </div>
+      <div class="message-detail" id="messageDetail">
+        <div class="detail-empty">
+          <div class="detail-empty-icon">✉</div>
+          <div>Select a message to view details</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+let adminToken = '';
+let currentFilter = 'all';
+let currentSort = 'score';
+let allMessages = [];
+let selectedId = null;
+
+function login() {
+  const token = document.getElementById('tokenInput').value.trim();
+  if (!token) return;
+  adminToken = token;
+  loadData();
+}
+
+document.getElementById('tokenInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') login();
+});
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadData();
+}
+
+function setSort(s, btn) {
+  currentSort = s;
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadData();
+}
+
+async function loadData() {
+  try {
+    const [msgsRes, statsRes] = await Promise.all([
+      fetch(`/api/inbox?filter=${currentFilter}&sort=${currentSort}`, { headers: { 'x-admin-token': adminToken } }),
+      fetch(`/api/inbox/stats/overview?token=${adminToken}`, { headers: { 'x-admin-token': adminToken } })
+    ]);
+
+    if (msgsRes.status === 401) {
+      document.getElementById('authError').style.display = 'block';
+      adminToken = '';
+      return;
+    }
+
+    document.getElementById('authOverlay').style.display = 'none';
+    document.getElementById('appContent').style.display = 'grid';
+
+    const { messages } = await msgsRes.json();
+    allMessages = messages;
+    renderMessages(messages);
+
+    if (statsRes.ok) {
+      const stats = await statsRes.json();
+      document.getElementById('s-total').textContent = stats.total;
+      document.getElementById('s-high').textContent = stats.high;
+      document.getElementById('s-unread').textContent = stats.unread;
+      document.getElementById('s-avg').textContent = stats.avgScore;
+    }
+
+    document.getElementById('msgCount').textContent = `${messages.length} message${messages.length !== 1 ? 's' : ''}`;
+
+    // Re-select current if still exists
+    if (selectedId) {
+      const still = messages.find(m => m.id === selectedId);
+      if (still) renderDetail(still);
+    }
+
+  } catch (err) {
+    document.getElementById('messagesList').innerHTML = `<div class="loading-msg">Error: ${err.message}</div>`;
+  }
+}
+
+function renderMessages(messages) {
+  const list = document.getElementById('messagesList');
+  if (!messages.length) {
+    list.innerHTML = '<div class="loading-msg">No messages yet. Share your portfolio!</div>';
+    return;
+  }
+
+  list.innerHTML = messages.map(m => {
+    const score = m.score || 0;
+    const priority = m.priority || 'normal';
+    const date = new Date(m.timestamp).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    const isActive = m.id === selectedId ? 'active' : '';
+    const isUnread = !m.read ? 'unread' : '';
+
+    return `<div class="message-item ${isActive} ${isUnread}" onclick="selectMessage('${m.id}')">
+      <div class="msg-header">
+        <div class="msg-name">${esc(m.name)}</div>
+        <div class="msg-date">${date}</div>
+      </div>
+      <div class="msg-subject">${esc(m.subject)}</div>
+      <div class="msg-preview">${esc(m.message.slice(0, 80))}...</div>
+      <div class="msg-footer">
+        <span class="priority-badge ${priority}">${priority}</span>
+        <div class="score-bar">
+          <span class="score-num">${score}</span>
+          <div class="score-track"><div class="score-fill" style="width:${score}%"></div></div>
+        </div>
+        ${m.geminiAnalysis?.tags?.slice(0,2).map(t => `<span style="font-size:0.6rem;color:var(--muted)">${t}</span>`).join('') || ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function selectMessage(id) {
+  selectedId = id;
+
+  // Mark as read
+  await fetch(`/api/inbox/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+    body: JSON.stringify({ read: true })
+  });
+
+  const msg = allMessages.find(m => m.id === id);
+  if (msg) {
+    msg.read = true;
+    renderMessages(allMessages);
+    renderDetail(msg);
+  }
+}
+
+function renderDetail(msg) {
+  const a = msg.geminiAnalysis;
+  const date = new Date(msg.timestamp).toLocaleString('en-IN');
+  const mailtoLink = `mailto:${msg.email}?subject=Re: ${encodeURIComponent(msg.subject)}`;
+
+  let aiHtml = '';
+
+  if (!msg.analyzed) {
+    aiHtml = `<div class="ai-panel">
+      <div class="ai-panel-title"><span class="ai-icon">✦</span> Gemini AI Analysis</div>
+      <div class="analyzing-badge"><div class="analyzing-dot"></div> Analyzing with Gemini 1.5 Flash...</div>
+    </div>`;
+  } else if (a) {
+    const scoreColor = a.score >= 70 ? '#e8ff47' : a.score >= 40 ? '#4a9eff' : '#7a7672';
+    aiHtml = `<div class="ai-panel">
+      <div class="ai-panel-title"><span class="ai-icon">✦</span> Gemini AI Analysis <span style="color:var(--muted);font-size:0.6rem;margin-left:auto">${a.model || 'gemini'}</span></div>
+      <div class="ai-score-big">
+        <span class="ai-score-num" style="color:${scoreColor}">${a.score}</span>
+        <span class="ai-score-denom">/100 opportunity score</span>
+      </div>
+      ${a.summary ? `<div class="ai-summary">${esc(a.summary)}</div>` : ''}
+      ${a.tags?.length ? `<div class="ai-tags">${a.tags.map(t => `<span class="ai-tag">${esc(t)}</span>`).join('')}</div>` : ''}
+      ${a.insights?.length ? `
+        <div style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:0.6rem">Insights</div>
+        <div class="ai-insights">
+          ${a.insights.map(i => `<div class="insight-item"><span class="insight-bullet">→</span><span class="insight-text">${esc(i)}</span></div>`).join('')}
+        </div>` : ''}
+      ${a.replyHint ? `<div class="ai-reply-hint">💡 ${esc(a.replyHint)}</div>` : ''}
+      ${a.error ? `<div style="font-size:0.75rem;color:var(--muted)">${a.error}</div>` : ''}
+    </div>`;
+  }
+
+  document.getElementById('messageDetail').innerHTML = `
+    <div class="detail-meta">
+      <div class="detail-from">${esc(msg.name)}</div>
+      <div class="detail-email">${esc(msg.email)}</div>
+      <div class="detail-info-grid">
+        <div class="detail-info-row"><span class="detail-info-label">Company</span><span class="detail-info-val">${msg.company || '—'}</span></div>
+        <div class="detail-info-row"><span class="detail-info-label">Received</span><span class="detail-info-val">${date}</span></div>
+        <div class="detail-info-row"><span class="detail-info-label">Priority</span><span class="detail-info-val"><span class="priority-badge ${msg.priority || 'normal'}">${msg.priority || 'normal'}</span></span></div>
+        <div class="detail-info-row"><span class="detail-info-label">Score</span><span class="detail-info-val" style="color:var(--accent)">${msg.score || 0}/100</span></div>
+      </div>
+    </div>
+
+    <div class="detail-subject">${esc(msg.subject)}</div>
+    <div class="detail-body">${esc(msg.message)}</div>
+
+    ${aiHtml}
+
+    <div class="detail-actions">
+      <a href="${mailtoLink}" class="action-btn primary" style="text-decoration:none;display:inline-block">Reply via Email →</a>
+      <button class="action-btn danger" onclick="deleteMsg('${msg.id}')">Delete</button>
+    </div>
+  `;
+}
+
+async function deleteMsg(id) {
+  if (!confirm('Delete this message?')) return;
+  await fetch(`/api/inbox/${id}`, { method: 'DELETE', headers: { 'x-admin-token': adminToken } });
+  selectedId = null;
+  document.getElementById('messageDetail').innerHTML = '<div class="detail-empty"><div class="detail-empty-icon">✉</div><div>Select a message to view details</div></div>';
+  loadData();
+}
+
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Auto-refresh every 30 seconds for new messages & analysis updates
+setInterval(() => { if (adminToken) loadData(); }, 30000);
+</script>
+</body>
+</html>
